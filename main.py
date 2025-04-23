@@ -30,6 +30,8 @@ result = connection.execute(
         deadline DATE NOT NULL,
         user VARCHAR(255) NOT NULL,
         FOREIGN KEY (user) REFERENCES users(username) ON DELETE CASCADE);
+
+        CREATE TABLE IF NOT EXISTS macalisang ();
         """))
 
 print(result)
