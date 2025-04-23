@@ -33,6 +33,7 @@ result = connection.execute(
         """))
 
 print(result)
+print(asd.get_table_names())
 
 # API
 
