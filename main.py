@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import HTTPException
 from pydantic import BaseModel
 
 from sqlalchemy import create_engine, inspect
@@ -28,11 +29,13 @@ result = connection.execute(
         id SERIAL PRIMARY KEY,
         task VARCHAR(255) NOT NULL,
         deadline DATE NOT NULL,
-        user VARCHAR(255) NOT NULL,
-        FOREIGN KEY (user) REFERENCES users(username) ON DELETE CASCADE);
+        username VARCHAR(255) NOT NULL,
+        FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE);
 
         CREATE TABLE IF NOT EXISTS macalisang ();
         """))
+
+connection.commit()
 
 print(result)
 print(asd.get_table_names())
@@ -65,11 +68,12 @@ async def user_login(user: User):
         text("""
             SELECT * FROM users
             WHERE username = :username AND password = :password;
-            """), username=user.username, password=user.password)
+            """).bindparams(username=user.username, password=user.password)
+    )
     if not result.mappings().all():
         return {"status": "User Not Found!"}
     else:
-        return {"status": "Logged In!"}
+        return {"status": "Logged in"}
 
 @app.post("/create_user/")
 async def create_user(user: User):
@@ -78,20 +82,22 @@ async def create_user(user: User):
         text("""
             SELECT * FROM users
             WHERE username = :username;
-            """), username=user.username)
+            """).bindparams(username=user.username)
+    )
     if result.mappings().all():
-        return {"status": "User already exists!"}
+        raise HTTPException(status_code=400, headers={"X-Error": "User already exists!"}, detail="User already exists!")
     # Insert user into database
     try:
         connection.execute(
             text("""
                 INSERT INTO users (username, password) VALUES (:username, :password);
-                """), username=user.username, password=user.password)
+                """).bindparams(username=user.username, password=user.password)
+        )
         connection.commit()
         return {"status": "User Created!"}
     except Exception as e:
         print(e)
-        return {"status": "Error Creating User!"}
+        raise HTTPException(status_code=500, headers={"X-Error": "Error Creating User!"}, detail="Error creating user!")
 
 @app.post("/create_task/")
 async def create_task(task: Task):
@@ -100,15 +106,17 @@ async def create_task(task: Task):
         text("""
             SELECT * FROM users
             WHERE username = :username;
-            """), username=task.user)
+            """).bindparams(username=task.user)
+    )
     if not result.mappings().all():
         return {"status": "User Not Found!"}
     # Insert task into database
     try:
         connection.execute(
             text("""
-                INSERT INTO tasks (task, deadline, user) VALUES (:task, :deadline, :user);
-                """), task=task.task, deadline=task.deadline, user=task.user)
+                INSERT INTO tasks (task, deadline, username) VALUES (:task, :deadline, :user);
+                """).bindparams(task=task.task, deadline=task.deadline, user=task.user)
+        )
         connection.commit()
         return {"status": "Task Created!"}
     except Exception as e:
@@ -119,19 +127,32 @@ async def create_task(task: Task):
 async def get_tasks(name: str):
     # Check if user exists
     try:
-        connection.execute(
+        user_check = connection.execute(
             text("""
                 SELECT * FROM users
                 WHERE username = :username;
-                """), username=name)
+                """).bindparams(username=name)
+        )
+        if not user_check.mappings().all():
+            return {"status": "User Not Found!"}
     except Exception as e:
         print(e)
-        return {"status": "User Not Found!"}
+        return {"status": "Error checking user!"}
+    
     # Fetch tasks from database
-    result = connection.execute(
-        text("""
-            SELECT * FROM tasks
-            WHERE user = :username;
-            """), username=name)
-    tasks = result.mappings().all()
-    return {"tasks": tasks}
+    try:
+        result = connection.execute(
+            text("""
+                SELECT task, deadline FROM tasks
+                WHERE username = :username;
+                """).bindparams(username=name)
+        )
+        tasks = result.mappings().all()
+        # Format tasks as a list of strings
+        formatted_tasks = [
+            f"Task: {task['task']}, Deadline: {task['deadline']}" for task in tasks
+        ]
+        return {"tasks": formatted_tasks}
+    except Exception as e:
+        print(e)
+        return {"status": "Error fetching tasks!"}
