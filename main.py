@@ -28,7 +28,7 @@ result = connection.execute(
         CREATE TABLE IF NOT EXISTS tasks (
         id SERIAL PRIMARY KEY,
         task VARCHAR(255) NOT NULL,
-        deadline DATE NOT NULL,
+        deadline VARCHAR(255) NOT NULL,
         username VARCHAR(255) NOT NULL,
         FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE);
 
@@ -36,8 +36,6 @@ result = connection.execute(
         """))
 
 connection.commit()
-
-print(result)
 print(asd.get_table_names())
 
 # API
@@ -58,7 +56,7 @@ class User(BaseModel):
 
 class Task(BaseModel):
     task: str
-    deadline: str 
+    deadline: str
     user: str
  
 @app.post("/login/")
@@ -149,9 +147,7 @@ async def get_tasks(name: str):
         )
         tasks = result.mappings().all()
         # Format tasks as a list of strings
-        formatted_tasks = [
-            f"Task: {task['task']}, Deadline: {task['deadline']}" for task in tasks
-        ]
+        formatted_tasks = [f"Task: {task['task']}, Deadline: {task['deadline']}" for task in tasks]
         return {"tasks": formatted_tasks}
     except Exception as e:
         print(e)
